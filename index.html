@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<!--
+  DoodlePaste visual reproduction, based on felixphew/pokepaste (v3).
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DoodlePaste</title>
+  <style>
+    @font-face { font-family: "M+ 1c"; src: url("https://raw.githubusercontent.com/felixphew/pokepaste/v3/assets/fonts/mplus-1c-regular.woff2") format("woff2"); }
+    @font-face { font-family: "M+ 1m"; src: url("https://raw.githubusercontent.com/felixphew/pokepaste/v3/assets/fonts/mplus-1m-regular.woff2") format("woff2"); }
+    body { margin: 0; }
+    #create-view form { display: flex; flex-flow: row wrap; }
+    #create-view form > textarea { flex: 1 1 auto; width: 600px; height: 100vh; margin: 0; border: 0; padding: 12px; box-sizing: border-box; background: #000; color: #fff; font: 12px "M+ 1m", monospace; resize: none; }
+    #sidebar { flex: 0 1 auto; width: 300px; padding: 0 12px; box-sizing: border-box; font: 12px "M+ 1c", sans-serif; }
+    #sidebar label { display: block; width: 100%; margin: 3px 0; text-align: right; }
+    #sidebar input[type="text"], #sidebar textarea { width: 75%; margin: 0 0 0 6px; border: 0; padding: 3px; border-radius: 2px; background: #ccc; font: inherit; }
+    #sidebar textarea { vertical-align: middle; }
+    #sidebar input[type="submit"] { width: 100%; margin: 0; border: 0; padding: 6px; background: inherit; font: inherit; font-size: larger; text-align: center; }
+    #paste-view { min-height: 100vh; background: #000; color: #fff; font: 12px "M+ 1c", sans-serif; }
+    #paste-view article { display: flex; flex-flow: row wrap; align-items: flex-start; }
+    #paste-view .img { position: relative; margin: 15px; user-select: none; }
+    #paste-view .img-pokemon { width: 150px; height: 150px; }
+    #paste-view .img-item { position: absolute; right: 0; bottom: 0; width: 40px; height: 40px; }
+    #paste-view pre { margin: 15px 15px 0; font: 15px "M+ 1m", monospace; white-space: pre-wrap; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main id="create-view">
+    <form id="paste-form">
+      <textarea name="paste" placeholder="Paste something here!" aria-label="Paste"></textarea>
+      <div id="sidebar">
+        <h1>DoodlePaste</h1>
+        <label>Title<input type="text" name="title"></label>
+        <label>Author<input type="text" name="author"></label>
+        <label>Notes<textarea name="notes" rows="5"></textarea></label>
+        <input type="submit" value="Submit Paste!">
+        <h2>What is this?</h2>
+        <p>DoodlePaste is a way to share Doodle World sets with anyone.</p>
+        <h2>How does it work?</h2>
+        <ol>
+          <li>Paste your team (from <a href="https://bwiffs.github.io/doodle-world-teambuilder/">The Teambuilder</a>), or type it out (using the correct format).</li>
+          <li>Add your name, a title, or notes (all optional).</li>
+          <li>Share</li>
+        </ol>
+        <h2>Having problems?</h2>
+        <p>Check out the format to make sure you're doing everything correctly, then file an issue.</p>
+      </div>
+    </form>
+  </main>
+
+  <main id="paste-view" hidden>
+    <div id="team-output"></div>
+  </main>
+
+  <script>
+    var assetBase = 'https://raw.githubusercontent.com/bwiffs/doodlepaste/main';
+    var specialRunestones = {
+      'Boblop Feather': 'Boblop_Feather.webp', 'Boblop Wing': 'Boblop_Feather.webp',
+      'Calamander Candy': 'Calamander_Candy.webp', 'Exoskelis Shard': 'Exoskelis_Shard.webp',
+      'Fancyoon Boa': 'Fancyoon_Boa.webp', 'Fluppy Petal': 'Fluppy_Petal.webp',
+      'Hangryphus Pie': 'Hangryphus_Pie.webp', 'Hollihare Wreath': 'Hollihare_Wreath.webp',
+      "Hypnotl's Antigen": 'Hypnotl_Antigen.webp', 'Hypnotl Antigen': 'Hypnotl_Antigen.webp',
+      'Jellupy Whisk': 'Jellupy_Whisk.webp', 'Jinglark Present': 'Jinglark_Present.webp',
+      'Kinglith Pyreblade': 'Kinglith_Pyreblade.webp', 'Ostigon Collar': 'Ostigon_Collar.webp',
+      'Snowclowne Silly Cone': 'Snowclowne_Silly_Cone.webp', 'Umaisho Matcha': 'Umaisho_Matcha.webp'
+    };
+    var artificialRunestoneOwners = {
+      'Boblop Feather': 'Boblop', 'Boblop Wing': 'Boblop', 'Calamander Candy': 'Calamander',
+      'Exoskelis Shard': 'Exoskelis', 'Fancyoon Boa': 'Fancyoon', 'Fluppy Petal': 'Fluppy',
+      'Hangryphus Pie': 'Hangryphus', 'Hollihare Wreath': 'Hollihare',
+      "Hypnotl's Antigen": 'Hypnotl', 'Hypnotl Antigen': 'Hypnotl', 'Jellupy Whisk': 'Jellupy',
+      'Jinglark Present': 'Jinglark', 'Kinglith Pyreblade': 'Kinglith', 'Ostigon Collar': 'Ostigon',
+      'Snowclowne Silly Cone': 'Snowclowne', 'Umaisho Matcha': 'Umaisho'
+    };
+
+    function fileName(name) {
+      return name.replace(/'/g, '').replace(/\s+/g, '_');
+    }
+
+    function isMatchingRunestone(doodleName, itemName) {
+      var genericRune = new RegExp('^' + doodleName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ' (Rune|Runestone)$', 'i').test(itemName || '');
+      return genericRune || artificialRunestoneOwners[itemName] === doodleName;
+    }
+
+    function doodleInfo(name, itemName) {
+      var parenthesizedGender = name.match(/^(.*) \((F|M)\)$/i);
+      if (parenthesizedGender) return { file: parenthesizedGender[1] + '_1.webp', label: parenthesizedGender[1], gender: parenthesizedGender[2].toUpperCase() };
+      var gender = name.match(/^(.*)-(F|M)$/i);
+      if (gender) return { file: gender[1] + '_1.webp', label: gender[1], gender: gender[2].toUpperCase() };
+      if (/-A$/i.test(name)) return { file: 'A-' + name.slice(0, -2) + '_1.webp', label: name };
+      if (isMatchingRunestone(name, itemName)) return { file: 'A-' + name + '_1.webp', label: name };
+      var lacergenData = (itemName || '').match(/^(Earth|Fire|Ice|Spark) Data$/i);
+      if (/^Lacergen(?:-Base)?$/i.test(name) && lacergenData) {
+        var type = lacergenData[1].charAt(0).toUpperCase() + lacergenData[1].slice(1).toLowerCase();
+        return { file: 'Lacergen-' + type + '_1.webp', label: 'Lacergen-' + type };
+      }
+      return { file: name + '_1.webp', label: name };
+    }
+
+    function itemInfo(name) {
+      if (!name || name === 'None') return null;
+      var special = specialRunestones[name];
+      var isRune = / (Rune|Runestone)$/i.test(name) || special;
+      var file = special || fileName(name).replace(/_Runestone$/i, '_Rune') + '.webp';
+      return { file: file, folder: isRune ? 'Runestones' : 'Items' };
+    }
+
+    function appendSetText(pre, lines, info) {
+      if (info.gender) {
+        pre.append(document.createTextNode(info.label + ' ('));
+        var gender = document.createElement('span');
+        gender.textContent = info.gender;
+        gender.style.color = info.gender === 'F' ? '#ff69b4' : '#55aaff';
+        pre.append(gender, document.createTextNode(')' + lines[0].slice(info.label.length + 2)));
+      } else {
+        pre.append(document.createTextNode(lines[0]));
+      }
+      if (lines.length > 1) pre.append(document.createTextNode('\n' + lines.slice(1).join('\n')));
+    }
+
+    function renderTeam(text) {
+      var output = document.getElementById('team-output');
+      output.replaceChildren();
+      var sets = text.trim().split(/\n\s*\n/).filter(Boolean);
+      sets.forEach(function (set) {
+        var lines = set.split('\n');
+        var parts = lines[0].split('@');
+        var itemName = parts.length > 1 ? parts.slice(1).join('@').trim() : '';
+        var item = itemInfo(itemName);
+        var doodle = doodleInfo(parts[0].trim(), itemName);
+        var article = document.createElement('article');
+        var imageBox = document.createElement('div');
+        imageBox.className = 'img';
+        var doodleImage = document.createElement('img');
+        doodleImage.className = 'img-pokemon';
+        doodleImage.src = assetBase + '/Doodles/' + doodle.file;
+        doodleImage.alt = doodle.label;
+        imageBox.append(doodleImage);
+        if (item) {
+          var itemImage = document.createElement('img');
+          itemImage.className = 'img-item';
+          itemImage.src = assetBase + '/' + item.folder + '/' + item.file;
+          itemImage.alt = parts.slice(1).join('@').trim();
+          imageBox.append(itemImage);
+        }
+        var pre = document.createElement('pre');
+        appendSetText(pre, lines, doodle);
+        article.append(imageBox, pre);
+        output.append(article);
+      });
+    }
+
+    document.getElementById('paste-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      var pastedText = this.elements.paste.value;
+      if (pastedText) renderTeam(pastedText);
+      document.getElementById('create-view').hidden = true;
+      document.getElementById('paste-view').hidden = false;
+      document.title = this.elements.title.value || 'Untitled DoodlePaste';
+    });
+  </script>
+</body>
+</html>
