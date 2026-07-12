@@ -75,6 +75,10 @@
       'Jinglark Present': 'Jinglark', 'Kinglith Pyreblade': 'Kinglith', 'Ostigon Collar': 'Ostigon',
       'Snowclowne Silly Cone': 'Snowclowne', 'Umaisho Matcha': 'Umaisho'
     };
+    var doodleNameAliases = {
+      'Peaktrice-F': 'Peakatrice-F',
+      'Peaktrice-M': 'Peakatrice-M'
+    };
 
     function fileName(name) {
       return name.replace(/'/g, '').replace(/\s+/g, '_');
@@ -87,9 +91,12 @@
 
     function doodleInfo(name, itemName) {
       var parenthesizedGender = name.match(/^(.*) \((F|M)\)$/i);
-      if (parenthesizedGender) return { file: parenthesizedGender[1] + '_1.webp', label: parenthesizedGender[1], gender: parenthesizedGender[2].toUpperCase() };
+      if (parenthesizedGender) return { file: parenthesizedGender[1] + '-' + parenthesizedGender[2].toUpperCase() + '_1.webp', label: parenthesizedGender[1], gender: parenthesizedGender[2].toUpperCase() };
       var gender = name.match(/^(.*)-(F|M)$/i);
-      if (gender) return { file: gender[1] + '_1.webp', label: gender[1], gender: gender[2].toUpperCase() };
+      if (gender) {
+        var imageName = doodleNameAliases[name] || name;
+        return { file: imageName + '_1.webp', label: imageName.slice(0, -2), gender: gender[2].toUpperCase() };
+      }
       if (/-A$/i.test(name)) return { file: 'A-' + name.slice(0, -2) + '_1.webp', label: name };
       if (isMatchingRunestone(name, itemName)) return { file: 'A-' + name + '_1.webp', label: name };
       var lacergenData = (itemName || '').match(/^(Earth|Fire|Ice|Spark) Data$/i);
