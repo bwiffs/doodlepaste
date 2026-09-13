@@ -18,12 +18,18 @@
     #sidebar input[type="text"], #sidebar textarea { width: 75%; margin: 0 0 0 6px; border: 0; padding: 3px; border-radius: 2px; background: #ccc; font: inherit; }
     #sidebar textarea { vertical-align: middle; }
     #sidebar input[type="submit"] { width: 100%; margin: 0; border: 0; padding: 6px; background: inherit; font: inherit; font-size: larger; text-align: center; }
-    #paste-view { min-height: 100vh; background: #000; color: #fff; font: 12px "M+ 1c", sans-serif; }
+    #paste-view { position: relative; min-height: 100vh; background: #000; color: #fff; font: 12px "M+ 1c", sans-serif; }
+    #team-output { box-sizing: border-box; padding-right: 300px; }
     #paste-view article { display: flex; flex-flow: row wrap; align-items: flex-start; }
     #paste-view .img { position: relative; margin: 15px; user-select: none; }
     #paste-view .img-pokemon { width: 150px; height: 150px; }
     #paste-view .img-item { position: absolute; right: 0; bottom: 0; width: 55px; height: 55px; }
     #paste-view pre { margin: 15px 15px 0; font: 15px "M+ 1m", monospace; white-space: pre-wrap; }
+    #paste-meta { position: absolute; top: 15px; right: 18px; width: 255px; font: 12px "M+ 1c", sans-serif; }
+    #paste-meta h1 { margin: 0 0 8px; font-size: 20px; }
+    #paste-meta .author { margin: 0 0 8px; }
+    #paste-meta .notes { margin: 0; white-space: pre-wrap; }
+    @media (max-width: 760px) { #team-output { padding-right: 0; } #paste-meta { position: static; width: auto; margin: 15px; } }
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -53,6 +59,7 @@
 
   <main id="paste-view" hidden>
     <div id="team-output"></div>
+    <aside id="paste-meta" hidden></aside>
   </main>
 
   <script>
@@ -65,8 +72,13 @@
       "Hypnotl's Antigen": 'Hypnotl_Antigen.webp', 'Hypnotl Antigen': 'Hypnotl_Antigen.webp',
       'Jellupy Whisk': 'Jellupy_Whisk.webp', 'Jinglark Present': 'Jinglark_Present.webp',
       'Kinglith Pyreblade': 'Kinglith_Pyreblade.webp', 'Ostigon Collar': 'Ostigon_Collar.webp',
-      'Snowclowne Silly Cone': 'Snowclowne_Silly_Cone.webp', 'Umaisho Matcha': 'Umaisho_Matcha.webp', 
+      'Snowclowne Silly Cone': 'Snowclowne_Silly_Cone.webp', 'Umaisho Matcha': 'Umaisho_Matcha.webp',
       'Junipyro Berry': 'Junipyro_Berry.webp'
+    };
+    var specialItemFiles = {
+      'Kindled Heart': 'Kindled_Heart.png',
+      'Vengeful Cape': 'Vengeful_Cape.png',
+      'Guardian Feather': 'Guardian_Feathery.png'
     };
     var artificialRunestoneOwners = {
       'Boblop Feather': 'Boblop', 'Boblop Wing': 'Boblop', 'Calamander Candy': 'Calamander',
@@ -80,7 +92,6 @@
       'Peaktrice-F': 'Peakatrice-F',
       'Peaktrice-M': 'Peakatrice-M'
     };
-
     function fileName(name) {
       return name.replace(/'/g, '').replace(/\s+/g, '_');
     }
@@ -111,9 +122,37 @@
     function itemInfo(name) {
       if (!name || name === 'None') return null;
       var special = specialRunestones[name];
+      var specialItem = specialItemFiles[name];
       var isRune = / (Rune|Runestone)$/i.test(name) || special;
-      var file = special || fileName(name).replace(/_Runestone$/i, '_Rune') + '.webp';
+      var file = special || specialItem || fileName(name).replace(/_Runestone$/i, '_Rune') + '.webp';
       return { file: file, folder: isRune ? 'Runestones' : 'Items' };
+    }
+
+    function renderMeta(title, author, notes) {
+      var meta = document.getElementById('paste-meta');
+      meta.replaceChildren();
+      if (!title && !author && !notes) {
+        meta.hidden = true;
+        return;
+      }
+      if (title) {
+        var heading = document.createElement('h1');
+        heading.textContent = title;
+        meta.append(heading);
+      }
+      if (author) {
+        var byline = document.createElement('p');
+        byline.className = 'author';
+        byline.textContent = 'By ' + author;
+        meta.append(byline);
+      }
+      if (notes) {
+        var noteText = document.createElement('p');
+        noteText.className = 'notes';
+        noteText.textContent = notes;
+        meta.append(noteText);
+      }
+      meta.hidden = false;
     }
 
     function appendSetText(pre, lines, info) {
@@ -165,6 +204,7 @@
       event.preventDefault();
       var pastedText = this.elements.paste.value;
       if (pastedText) renderTeam(pastedText);
+      renderMeta(this.elements.title.value.trim(), this.elements.author.value.trim(), this.elements.notes.value.trim());
       document.getElementById('create-view').hidden = true;
       document.getElementById('paste-view').hidden = false;
       document.title = this.elements.title.value || 'Untitled DoodlePaste';
